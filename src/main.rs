@@ -23,15 +23,38 @@ async fn main() -> color_eyre::Result<()>{
         .init();
 
     info!("Establishing TCPconnection...");
-    let stream = TcpStream::connect("example.com:443").await?;
+    let stream = TcpStream::connect("example.org:443").await?;
 
     info!("Setting up TLS root certificate store");
-    let mut roots = rustls::RootCertStore::empty();
+    let mut root_store = rustls::RootCertStore::empty();
     for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
-        roots.add(cert).unwrap();
+        root_store.add(cert).unwrap();
     }
 
+    let mut client_config = ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    client_config.key_log = Arc::new(KeyLogFile::new());
+    let connector = tokio_rustls::TlsConnector::from(Arc::new(client_config));
+
+    info!("Performing TLS handshake");
+    let mut stream = connector.connect("example.org".try_into()?, stream).await?;
+
+    info!("Sending HTTP/1.1 request");
+    let req = [
+        "GET / HTTP/1.1",
+        "Host: example.org",
+        "User-Agent: cool-bear/1.0",
+        "Connection: close",
+        "",
+        "",
+    ].join("\r\n");
+    stream.write_all(req.as_bytes()).await?;
+
     
+
+
     println!("Hello, world!");
 
     Ok(())
