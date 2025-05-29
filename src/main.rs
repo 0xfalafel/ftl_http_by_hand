@@ -10,6 +10,12 @@ use tokio::{
 use tracing::info;
 use tracing_subscriber::{filter::targets::Targets, layer::SubscriberExt, util::SubscriberInitExt};
 
-fn main() {
+#[tokio::main]
+async fn main() -> color_eyre::Result<()>{
+    color_eyre::install().unwrap();
+
+    
     println!("Hello, world!");
+
+    Ok(())
 }
