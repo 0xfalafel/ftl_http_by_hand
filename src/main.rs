@@ -11,6 +11,8 @@ use tokio::{
 use tracing::info;
 use tracing_subscriber::{filter::targets::Targets, layer::SubscriberExt, util::SubscriberInitExt};
 
+mod http11;
+
 #[tokio::main]
 async fn main() -> color_eyre::Result<()>{
     color_eyre::install().unwrap();
@@ -27,8 +29,9 @@ async fn main() -> color_eyre::Result<()>{
 
     info!("Setting up TLS root certificate store");
     let mut root_store = rustls::RootCertStore::empty();
-    for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
-        root_store.add(cert).unwrap();
+    for cert in rustls_native_certs::load_native_certs()
+        .expect("could not load platform certs") {
+            root_store.add(cert).unwrap();
     }
 
     let mut client_config = ClientConfig::builder()
@@ -36,10 +39,13 @@ async fn main() -> color_eyre::Result<()>{
         .with_no_client_auth();
 
     client_config.key_log = Arc::new(KeyLogFile::new());
-    let connector = tokio_rustls::TlsConnector::from(Arc::new(client_config));
+    let connector = tokio_rustls::TlsConnector::from(
+        Arc::new(client_config)
+    );
 
     info!("Performing TLS handshake");
-    let mut stream = connector.connect("example.org".try_into()?, stream).await?;
+    let mut stream = connector
+        .connect("example.org".try_into()?, stream).await?;
 
     info!("Sending HTTP/1.1 request");
     let req = [
@@ -52,8 +58,27 @@ async fn main() -> color_eyre::Result<()>{
     ].join("\r\n");
     stream.write_all(req.as_bytes()).await?;
 
-    
+    info!("Reading HTTP/1.1 response");
 
+    let mut accum : Vec<u8> = Default::default();
+    let mut rd_buf = [0u8; 1024];
+
+    let (body_offest, res) = loop {
+        let n = stream.read(&mut rd_buf[..]).await?;
+        info!("Reading {n} bytes");
+
+        if n == 0 {
+            return Err(eyre!(
+                "Unexpected EOF (server closed connection during headers)"
+            ));
+        }
+
+        accum.extend_from_slice(&rd_buf[..n]);
+
+        match http11::response(&accum) {
+
+        }
+    };
 
     println!("Hello, world!");
 
