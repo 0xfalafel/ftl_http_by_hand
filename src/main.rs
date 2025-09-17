@@ -63,7 +63,8 @@ async fn main() -> color_eyre::Result<()>{
     let mut accum : Vec<u8> = Default::default();
     let mut rd_buf = [0u8; 1024];
 
-    let (body_offest, res) = loop {
+    // let (body_offest, res) = 
+    loop {
         let n = stream.read(&mut rd_buf[..]).await?;
         info!("Reading {n} bytes");
 
@@ -75,9 +76,7 @@ async fn main() -> color_eyre::Result<()>{
 
         accum.extend_from_slice(&rd_buf[..n]);
 
-        match http11::response(&accum) {
-
-        }
+        let _ =  http11::response(&accum);
     };
 
     println!("Hello, world!");
