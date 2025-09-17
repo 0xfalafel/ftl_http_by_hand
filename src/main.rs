@@ -2,8 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use color_eyre::eyre::eyre;
 use nom::Offset;
-use rustls::{ClientConfig, KeyLogFile, RootCertStore};
-use rustls::pki_types::CertificateDer;
+use rustls::{ClientConfig, KeyLogFile};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -63,8 +62,7 @@ async fn main() -> color_eyre::Result<()>{
     let mut accum : Vec<u8> = Default::default();
     let mut rd_buf = [0u8; 1024];
 
-    // let (body_offest, res) = 
-    loop {
+    let (body_offest, res) = loop {
         let n = stream.read(&mut rd_buf[..]).await?;
         info!("Reading {n} bytes");
 
@@ -76,10 +74,46 @@ async fn main() -> color_eyre::Result<()>{
 
         accum.extend_from_slice(&rd_buf[..n]);
 
-        let _ =  http11::response(&accum);
+        match http11::response(&accum) {
+            Err(e) => {
+                if e.is_incomplete() {
+                    info!("Need to read more, continuing");
+                    continue;
+                } else {
+                    return Err(eyre!("parse error: {e}"));
+                }
+            },
+            Ok((remain, res)) => {
+                let body_offset = accum.offset(remain);
+                break (body_offset, res);
+            }
+        }
     };
 
-    println!("Hello, world!");
+    info!("Got HTTP1/1 response: {:#?}", res);
+    let mut body_accum = accum[body_offest..].to_vec();
+    // header names are case-insensitive, let's get it right. we're assuming
+    // that the absence of content-length means there's no body, and we also
+    // don't support chunked transfer encoding.
+    let content_length = res
+        .headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("content-length"))
+        .map(|(_, v)| v.parse::<usize>().unwrap())
+        .unwrap_or_default();
+    
+    while body_accum.len() < content_length {
+        let n = stream.read(&mut rd_buf[..]).await?;
+        info!("Read {n} bytes");
+        if n == 0 {
+            return Err(eyre!("unexpected EOF (peer closed connection during body)"))
+        }
+
+        body_accum.extend_from_slice(&rd_buf[..n]);
+    }
+
+    info!("===== Response body =====");
+    info!("{}", String::from_utf8_lossy(&body_accum));
 
     Ok(())
 }

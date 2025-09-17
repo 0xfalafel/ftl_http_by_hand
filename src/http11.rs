@@ -1,8 +1,9 @@
 use nom::{
-    bytes::streaming::{tag, take_until, take_while1}, character::complete::{space0, space1, u16}, combinator::{map_res, opt}, sequence::terminated, IResult, Parser
+    bytes::streaming::{tag, take_until}, character::complete::{space0, space1, u16}, combinator::{map_res, opt}, sequence::terminated, IResult, Parser
 };
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct Response<'a> {
     pub status: u16,
     pub status_text: &'a str,
