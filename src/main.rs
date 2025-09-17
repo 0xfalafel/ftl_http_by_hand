@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{net::ToSocketAddrs, str::FromStr, sync::Arc, time::Instant};
 
 use color_eyre::eyre::eyre;
 use nom::Offset;
@@ -23,8 +23,18 @@ async fn main() -> color_eyre::Result<()>{
         .with(format_layer)
         .init();
 
+    info!("Performing DNS lookup...");
+    let before = Instant::now();
+    let addr = "example.com:443"
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| eyre!("Failed to resolve address for example.com:443"))?;
+    println!("{:?} DNS lookup ", before.elapsed());
+
     info!("Establishing TCPconnection...");
-    let stream = TcpStream::connect("example.org:443").await?;
+    let before = Instant::now();
+    let stream = TcpStream::connect(addr).await?;
+    println!("{:?} TCP connect", before.elapsed());
 
     info!("Setting up TLS root certificate store");
     let mut root_store = rustls::RootCertStore::empty();
@@ -43,10 +53,13 @@ async fn main() -> color_eyre::Result<()>{
     );
 
     info!("Performing TLS handshake");
+    let before = Instant::now();
     let mut stream = connector
         .connect("example.org".try_into()?, stream).await?;
+    println!("{:?} TLS handshake", before.elapsed());
 
     info!("Sending HTTP/1.1 request");
+    let before = Instant::now();
     let req = [
         "GET / HTTP/1.1",
         "Host: example.org",
@@ -56,9 +69,10 @@ async fn main() -> color_eyre::Result<()>{
         "",
     ].join("\r\n");
     stream.write_all(req.as_bytes()).await?;
+    println!("{:?} Request send", before.elapsed());
 
     info!("Reading HTTP/1.1 response");
-
+    let before = Instant::now();
     let mut accum : Vec<u8> = Default::default();
     let mut rd_buf = [0u8; 1024];
 
@@ -89,8 +103,10 @@ async fn main() -> color_eyre::Result<()>{
             }
         }
     };
+    println!("{:?} Response header read", before.elapsed());
 
     info!("Got HTTP1/1 response: {:#?}", res);
+    let before = Instant::now();
     let mut body_accum = accum[body_offest..].to_vec();
     // header names are case-insensitive, let's get it right. we're assuming
     // that the absence of content-length means there's no body, and we also
@@ -111,7 +127,8 @@ async fn main() -> color_eyre::Result<()>{
 
         body_accum.extend_from_slice(&rd_buf[..n]);
     }
-
+    println!("{:?} Response body read", before.elapsed());
+    
     info!("===== Response body =====");
     info!("{}", String::from_utf8_lossy(&body_accum));
 

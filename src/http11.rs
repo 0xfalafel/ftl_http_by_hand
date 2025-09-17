@@ -46,7 +46,6 @@ pub fn response(i: &[u8]) -> IResult<&[u8], Response<'_>> {
     let mut i = i;
     loop {
         if let (i, Some(_)) = opt(tag(CRLF)).parse(i)? {
-            println!("We are done !");
             return Ok((i, res))
         }
 
