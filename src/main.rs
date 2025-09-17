@@ -34,6 +34,7 @@ async fn main() -> color_eyre::Result<()>{
     info!("Establishing TCPconnection...");
     let before = Instant::now();
     let stream = TcpStream::connect(addr).await?;
+    stream.set_nodelay(true)?;
     println!("{:?} TCP connect", before.elapsed());
 
     info!("Setting up TLS root certificate store");
