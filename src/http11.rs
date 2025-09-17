@@ -1,5 +1,10 @@
 use nom::{
-    bytes::streaming::{tag, take_until}, character::complete::{space0, space1, u16}, combinator::{map_res, opt}, sequence::terminated, IResult, Parser
+    bytes::streaming::{tag, take_until},
+    character::complete::{space0, space1, u16},
+    combinator::{map_res, opt},
+    sequence::terminated,
+    IResult,
+    Parser
 };
 
 #[derive(Debug)]
